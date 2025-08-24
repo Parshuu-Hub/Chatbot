@@ -131,6 +131,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 import os 
+import chromadb
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -180,10 +181,15 @@ if api_key:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=200)
         splits = text_splitter.split_documents(documents)
 
+        chroma_client = chromadb.Client(chromadb.config.Settings(
+        chroma_db_impl="duckdb+parquet",
+        persist_directory=".chroma"
+        ))
         vectorstore = Chroma.from_documents(
+            client=chroma_client,
             documents=splits,
             embedding=embeddings,
-            persist_directory="./chroma_db",
+            # persist_directory="./chroma_db",
             collection_name="pdf_collection"
         )
         retriever = vectorstore.as_retriever()

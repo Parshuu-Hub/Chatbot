@@ -20,4 +20,3 @@ langchain_chroma
 beautifulsoup4
 langserve
 langchain_groq
-sqlite3
