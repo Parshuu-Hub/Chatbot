@@ -10,6 +10,7 @@ requests
 pypdf
 bs4
 arxiv
+numpy<2.0
 pymupdf
 langchain-text-splitters
 chromadb==0.4.22
