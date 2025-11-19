@@ -1,4 +1,4 @@
-import os
+import os,tempfile
 import time
 from pathlib import Path
 from dotenv import load_dotenv
@@ -58,36 +58,60 @@ index = pc.Index(PINECONE_INDEX_NAME)
 # load, split, embed and upsert pdf docs content
 def load_vectorstore(uploaded_files):
     embed_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-    file_paths = []
+    # file_paths = []
     
     # 1. upload
-    for file in uploaded_files:
-        save_path = Path(UPLOAD_DIR) / file.filename
-        with open(save_path, "wb") as f:
-            f.write(file.file.read())
-        file_paths.append(str(save_path))
+    # for file in uploaded_files:
+    #     save_path = Path(UPLOAD_DIR) / file.filename
+    #     with open(save_path, "wb") as f:
+    #         f.write(file.file.read())
+    #     file_paths.append(str(save_path))
         
-    # 2. split
-    for file_path in file_paths:
-        loader = PyPDFLoader(file_path)
-        documents = loader.load()
+    # # 2. split
+    # for file_path in file_paths:
+    #     loader = PyPDFLoader(file_path)
+    #     documents = loader.load()
         
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        chunks = splitter.split_documents(documents)
+    #     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    #     chunks = splitter.split_documents(documents)
         
-        texts = [chunk.page_content for chunk in chunks]
-        metadata = [chunk.metadata | {"text": chunk.page_content} for chunk in chunks]
-        ids = [f"{Path(file_path).stem}-{i}" for i in range(len(chunks))]
+    #     texts = [chunk.page_content for chunk in chunks]
+    #     metadata = [chunk.metadata | {"text": chunk.page_content} for chunk in chunks]
+    #     ids = [f"{Path(file_path).stem}-{i}" for i in range(len(chunks))]
         
-        # 3. Embedding
-        print("Embedding chunks...")
-        embeddings = embed_model.embed_documents(texts)
-        print(f"Generated {len(embeddings)} embeddings of dimension {len(embeddings[0])}")
+    #     # 3. Embedding
+    #     print("Embedding chunks...")
+    #     embeddings = embed_model.embed_documents(texts)
+    #     print(f"Generated {len(embeddings)} embeddings of dimension {len(embeddings[0])}")
 
-        # 4. Upsert
-        print("Upserting embeddings...")
-        with tqdm(total=len(embeddings), desc="Upserting to Pinecone") as progress:
-            index.upsert(vectors=zip(ids, embeddings, metadata))
-            progress.update(len(embeddings))
+    #     # 4. Upsert
+    #     print("Upserting embeddings...")
+    #     with tqdm(total=len(embeddings), desc="Upserting to Pinecone") as progress:
+    #         index.upsert(vectors=zip(ids, embeddings, metadata))
+    #         progress.update(len(embeddings))
             
-        print(f"✅ Upload complete for {file_path}")
+    #     print(f"✅ Upload complete for {file_path}")
+    for file in uploaded_files:
+        # Save to a temp file in /tmp
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as temp:
+            temp.write(file.file.read())
+            temp.flush()
+            loader = PyPDFLoader(temp.name)
+            documents = loader.load()
+
+            splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+            chunks = splitter.split_documents(documents)
+
+            texts = [chunk.page_content for chunk in chunks]
+            metadata = [chunk.metadata for chunk in chunks]
+            ids = [f"{file.filename}-{i}" for i in range(len(chunks))]
+
+            print("Embedding chunks...")
+            embeddings = embed_model.embed_documents(texts)
+            print(f"Generated {len(embeddings)} embeddings of dimension {len(embeddings[0])}")
+
+            print("Upserting embeddings...")
+            with tqdm(total=len(embeddings), desc="Upserting to Pinecone") as progress:
+                index.upsert(vectors=zip(ids, embeddings, metadata))
+                progress.update(len(embeddings))
+            print(f"✅ Upload complete for {file.filename}")
