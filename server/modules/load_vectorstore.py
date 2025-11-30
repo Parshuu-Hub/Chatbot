@@ -7,6 +7,7 @@ from pinecone import Pinecone, ServerlessSpec
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from modules.cloudinary_storage import upload_pdf_to_cloudinary
 
 
 load_dotenv()
