@@ -10,9 +10,14 @@ router=APIRouter()
 async def upload_pdfs(files:List[UploadFile]=File(...)):
     try:
        logger.info("Received uploaded files")
-       load_vectorstore(files)
-       logger.info("Document added to vectorstore")
-       return {"messages":"Files processed and vectorstore updated"} 
+       file_urls = load_vectorstore(files)
+       return {
+            "message": "PDFs uploaded, text processed & stored in vector DB",
+            "urls": file_urls
+        }
+       # load_vectorstore(files)
+       # logger.info("Document added to vectorstore")
+       # return {"messages":"Files processed and vectorstore updated"} 
     
     except Exception as e:
         logger.exception("Error during pdf upload")
