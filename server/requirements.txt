@@ -33,6 +33,7 @@ tqdm
 # Logging (optional but recommended)
 loguru
 
-
+# Cloudinary
+cloudinary
 
 #  uv pip install -r requirements.txt
