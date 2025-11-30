@@ -17,8 +17,8 @@ PINECONE_ENV = "us-east-1"
 PINECONE_INDEX_NAME = "medicalindex"
 
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
-UPLOAD_DIR = "./uploaded_docs"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# UPLOAD_DIR = "./uploaded_docs"
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Initialize pinecone instance
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -58,6 +58,42 @@ index = pc.Index(PINECONE_INDEX_NAME)
 # load, split, embed and upsert pdf docs content
 def load_vectorstore(uploaded_files):
     embed_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+    file_urls = []
+
+    for file in uploaded_files:
+        # Upload to Cloudinary
+        file_bytes = file.file.read()
+        public_url = upload_pdf_to_cloudinary(file_bytes, file.filename, file.content_type)
+        file_urls.append(public_url)
+
+        # Save temporarily for PyPDFLoader
+        temp_pdf = Path("/tmp") / file.filename
+        with open(temp_pdf, "wb") as f:
+            f.write(file_bytes)
+
+        # Load & split PDF
+        loader = PyPDFLoader(str(temp_pdf))
+        documents = loader.load()
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        chunks = splitter.split_documents(documents)
+
+        texts = [c.page_content for c in chunks]
+        metadata = [c.metadata | {"text": c.page_content} for c in chunks]
+        ids = [f"{file.filename}-{i}" for i in range(len(chunks))]
+
+        # Embeddings
+        print("Generating embeddings...")
+        embeddings = embed_model.embed_documents(texts)
+
+        print("Upserting into Pinecone...")
+        with tqdm(total=len(embeddings)) as pbar:
+            index.upsert(vectors=zip(ids, embeddings, metadata))
+            pbar.update(len(embeddings))
+
+        print(f"Completed processing PDF: {file.filename}")
+
+    return file_urls
+
     # file_paths = []
     
     # 1. upload
@@ -91,27 +127,27 @@ def load_vectorstore(uploaded_files):
     #         progress.update(len(embeddings))
             
     #     print(f"✅ Upload complete for {file_path}")
-    for file in uploaded_files:
-        # Save to a temp file in /tmp
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as temp:
-            temp.write(file.file.read())
-            temp.flush()
-            loader = PyPDFLoader(temp.name)
-            documents = loader.load()
+    # for file in uploaded_files:
+    #     # Save to a temp file in /tmp
+    #     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as temp:
+    #         temp.write(file.file.read())
+    #         temp.flush()
+    #         loader = PyPDFLoader(temp.name)
+    #         documents = loader.load()
 
-            splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-            chunks = splitter.split_documents(documents)
+    #         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    #         chunks = splitter.split_documents(documents)
 
-            texts = [chunk.page_content for chunk in chunks]
-            metadata = [chunk.metadata for chunk in chunks]
-            ids = [f"{file.filename}-{i}" for i in range(len(chunks))]
+    #         texts = [chunk.page_content for chunk in chunks]
+    #         metadata = [chunk.metadata for chunk in chunks]
+    #         ids = [f"{file.filename}-{i}" for i in range(len(chunks))]
 
-            print("Embedding chunks...")
-            embeddings = embed_model.embed_documents(texts)
-            print(f"Generated {len(embeddings)} embeddings of dimension {len(embeddings[0])}")
+    #         print("Embedding chunks...")
+    #         embeddings = embed_model.embed_documents(texts)
+    #         print(f"Generated {len(embeddings)} embeddings of dimension {len(embeddings[0])}")
 
-            print("Upserting embeddings...")
-            with tqdm(total=len(embeddings), desc="Upserting to Pinecone") as progress:
-                index.upsert(vectors=zip(ids, embeddings, metadata))
-                progress.update(len(embeddings))
-            print(f"✅ Upload complete for {file.filename}")
+    #         print("Upserting embeddings...")
+    #         with tqdm(total=len(embeddings), desc="Upserting to Pinecone") as progress:
+    #             index.upsert(vectors=zip(ids, embeddings, metadata))
+    #             progress.update(len(embeddings))
+    #         print(f"✅ Upload complete for {file.filename}")
